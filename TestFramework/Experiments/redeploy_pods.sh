@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ../Config/SYSTEM.sh
+
 # SSH into the clabsvr, run a command, and exit (EOF)
 ssh -o StrictHostKeyChecking=no clabsvr << EOF
 echo "[+] Connected to server. Removing pods..."
@@ -31,7 +33,7 @@ sleep 15
 echo "[+] Loading data into memcached"
 # [~5 sec] load data
 echo "[+] Load memcached-primary dataset"
-curl --data "{\"memcached_server\":\"192.168.10.11:31212\"}" --header "Content-Type: application/json" http://192.168.10.10:32003/load
+curl --data "{\"memcached_server\":\"${CLIENT_IP}:31212\"}" --header "Content-Type: application/json" http://${SERVER_IP}:32003/load
 
 echo "[+] Setting up mysql-primary"
 cd ~/HarvestContainers/TestFramework/Containers/MySQL/
@@ -52,7 +54,7 @@ echo "[+] Loading data into mysql"
 # [~2 min] load data
 # currently ignores mysql_server as it's hardcoded. TODO: change this
 echo "[+] Load mysql-primary dataset"
-curl --data "{\"mysql_server\":\"192.168.10.11:32306\"}" --header "Content-Type: application/json" http://192.168.10.10:32002/load
+curl --data "{\"mysql_server\":\"${CLIENT_IP}:32306\"}" --header "Content-Type: application/json" http://${SERVER_IP}:32002/load
 
 
 echo "[+] Setting up xapian-primary"

@@ -5,6 +5,15 @@ metadata:
   labels:
     name: xapian-server
 spec:
+  # Run on the harvest worker (labelled by the dsb_k8s_perf harvest profile),
+  # tolerating the dedicated=special taint used to keep DSB pods off it
+  nodeSelector:
+    podtype: harvest
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: special
+      effect: NoSchedule
   containers:
     - name: xapian-primary
       image: asarma31/xapian-primary:latest 

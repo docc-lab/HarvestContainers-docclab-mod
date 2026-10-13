@@ -5,6 +5,15 @@ metadata:
   labels:
     name: mysql-server
 spec:
+  # Run on the harvest worker (labelled by the dsb_k8s_perf harvest profile),
+  # tolerating the dedicated=special taint used to keep DSB pods off it
+  nodeSelector:
+    podtype: harvest
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: special
+      effect: NoSchedule
   containers:
     - name: mysql-primary
       image: mysql:5.7

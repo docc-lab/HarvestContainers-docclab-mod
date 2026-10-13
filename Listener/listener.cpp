@@ -18,11 +18,13 @@ extern "C" {
 #include "getpids.h"
 }
 
+#ifndef DEVICE_FILENAME
 #define DEVICE_FILENAME "/dev/qidlecpu"
+#endif
 #define SERVER_PORT 10101
 #define TIMEOUT_SEC 1
 
-extern "C" int get_containers(char* pod_id);
+extern "C" int get_containers(const char* pod_id, int any_parent);
 int listenerControl;
 std::string read_payload(int sock);
 pthread_t conn_handler_thread;
@@ -84,7 +86,8 @@ void *handle_connection(void *arg)
     int sock = -1;
     socklen_t c;
     struct sockaddr_in server, client;
-    char send_buf[4] = "ACK";
+    char ack_buf[4] = "ACK";
+    char nak_buf[4] = "NAK";
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -108,6 +111,7 @@ void *handle_connection(void *arg)
     std::cout << "[+] [Listener] Listening for incoming connections on port " << SERVER_PORT << std::endl;
 
     while (listenerControl == 1) {
+        c = sizeof(client);
         sock = accept(sockfd, (struct sockaddr *)&client, &c);
         if (sock < 0) {
             continue;
@@ -125,17 +129,34 @@ void *handle_connection(void *arg)
 	    std::cout << "raw data:" << json_data << std::endl;
             auto json = nlohmann::json::parse(json_data);
             std::string ctr_type = json["ctr_type"];
+            bool ok = true;
             if (ctr_type == "Secondary") {
                 std::string pod_id = json["pod_id"];
+                /* "parent":"any" registers containers without a harvest_launcher
+                 * process, using their first non-pause task as the parent */
+                int any_parent = json.value("parent", std::string("harvest_launcher")) == "any";
                 std::cout << "[+] [Listener] Got Secondary pod_id " << pod_id << std::endl;
                 // Process containers for this pod
-                int result = get_containers(const_cast<char*>(pod_id.c_str()));
-                if (result < 0) {
+                int result = get_containers(pod_id.c_str(), any_parent);
+                if (result <= 0) {
                     std::cout << "[!] [Listener] Failed to process containers for pod " << pod_id << std::endl;
-                } else if (idleCpuStats->balancerControl == 0) {
+                    ok = false;
+                } else if (idleCpuStats->balancerControl != 1) {
+                    /* 0 = paused/never started, -1 = a previous Balancer exited */
                     idleCpuStats->balancerControl = 1;
                 }
+            } else if (ctr_type == "Reset") {
+                /* Pause the Balancer and forget all registered containers */
+                std::cout << "[+] [Listener] Got Reset" << std::endl;
+                idleCpuStats->balancerControl = 0;
+                idleCpuStats->nr_secondary_ctrs = 0;
+                idleCpuStats->nr_primary_ctrs = 0;
+                idleCpuStats->num_affinity = 0;
             } else if (ctr_type == "Primary") {
+                if (idleCpuStats->nr_primary_ctrs >= MAX_PODS) {
+                    std::cout << "[!] [Listener] Too many Primary containers" << std::endl;
+                    ok = false;
+                } else {
 		std::cout << "[!] [Listener] Got Primary with acbf: " << json ["LOWIDLEFREQ_THRESHOLD"] << std::endl;
                 std::string cpuList = json["cpuList"];
                 std::string LOWIDLEFREQ_THRESHOLD = json["LOWIDLEFREQ_THRESHOLD"];
@@ -155,11 +176,16 @@ void *handle_connection(void *arg)
                 idleCpuStats->primary_ctrs[idleCpuStats->nr_primary_ctrs].totalEligibleCores = idleCpuStats->primary_ctrs[idleCpuStats->nr_primary_ctrs].NUMCPUS;
                 idleCpuStats->primary_ctrs[idleCpuStats->nr_primary_ctrs].maxSecondaryCores = idleCpuStats->primary_ctrs[idleCpuStats->nr_primary_ctrs].totalEligibleCores - idleCpuStats->primary_ctrs[idleCpuStats->nr_primary_ctrs].targetIdleCores;
                 idleCpuStats->nr_primary_ctrs+=1;
+                }
+            } else {
+                std::cout << "[!] [Listener] Unknown ctr_type " << ctr_type << std::endl;
+                ok = false;
             }
 
-            // Send ACK response
-            ssize_t bytes_sent = write(sock, send_buf, sizeof(send_buf));
-            if (bytes_sent < 0 || (size_t)bytes_sent != sizeof(send_buf)) {
+            // Send ACK (or NAK on failure) response
+            const char *send_buf = ok ? ack_buf : nak_buf;
+            ssize_t bytes_sent = write(sock, send_buf, sizeof(ack_buf));
+            if (bytes_sent < 0 || (size_t)bytes_sent != sizeof(ack_buf)) {
                 std::cout << "[!] [Listener] Failed to send response" << std::endl;
             }
 

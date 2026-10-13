@@ -8,7 +8,7 @@ source ../Config/SYSTEM.sh
 source ./secondary.sh
 
 YCSB_ALIAS="clabsvr"
-YCSB_HOST=192.168.10.11:32002
+YCSB_HOST=${CLIENT_IP}:32002
 
 ITER=$1
 SECONDARY_WORKERS=$2
@@ -30,7 +30,7 @@ SUMMARY_FILE="summary"
 
 if [ $TYPE == "harvest-irq" ] || [ $TYPE == "baseline-irq" ]; then
   YCSB_ALIAS="clabcl1"
-  YCSB_HOST="192.168.10.11:32004"
+  YCSB_HOST="${CLIENT_IP}:32004"
   SUMMARY_FILE="mysql-irq.summary"
 fi
 
@@ -139,7 +139,7 @@ harvest() {
 
   echo "[+] Start secondary workload in foreground"
   if [ $TYPE == "harvest-irq" ]; then
-    secondary $DURATION "192.168.10.11:30300" "nwbully-secondary"
+    secondary $DURATION "${CLIENT_IP}:30300" "nwbully-secondary"
   else  
     secondary $DURATION
   fi

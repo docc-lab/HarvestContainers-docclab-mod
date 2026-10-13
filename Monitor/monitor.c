@@ -10,10 +10,50 @@
 #include <linux/string.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/kprobes.h>
+#include <linux/version.h>
 
 #include "monitor.h"
 #include "shmem.h"
 #include "procfs.h"
+
+/* task_is_running() was added in 5.14 alongside the state -> __state rename */
+#ifndef task_is_running
+#define task_is_running(t) ((t)->state == TASK_RUNNING)
+#endif
+
+static unsigned long logsize = DEFAULT_LOGSIZE;
+module_param(logsize, ulong, 0444);
+MODULE_PARM_DESC(logsize, "Max number of cpulogger entries (24 bytes each)");
+
+/* idle_cpu() is not exported to modules by stock kernels. Resolve it at
+ * load time through kallsyms_lookup_name(), whose address we obtain with
+ * a kprobe since kallsyms_lookup_name() itself is unexported since 5.7. */
+typedef int (*idle_cpu_fn_t)(int cpu);
+static idle_cpu_fn_t idle_cpu_fn;
+
+static int resolve_idle_cpu(void)
+{
+    typedef unsigned long (*kallsyms_lookup_name_t)(const char *name);
+    kallsyms_lookup_name_t lookup;
+    struct kprobe kp = { .symbol_name = "kallsyms_lookup_name" };
+    int ret;
+
+    ret = register_kprobe(&kp);
+    if (ret < 0) {
+        pr_err("qidlecpu: register_kprobe(kallsyms_lookup_name) failed: %d\n", ret);
+        return ret;
+    }
+    lookup = (kallsyms_lookup_name_t)kp.addr;
+    unregister_kprobe(&kp);
+
+    idle_cpu_fn = (idle_cpu_fn_t)lookup("idle_cpu");
+    if (!idle_cpu_fn) {
+        pr_err("qidlecpu: could not resolve idle_cpu\n");
+        return -ENOENT;
+    }
+    return 0;
+}
 
 
 int set_irq_affinity(int num_cpus)
@@ -120,13 +160,11 @@ void twopa(void) {
     secondary_init_pid = find_vpid(curr_secondary_ctr_info->parent_pid);
     if (unlikely(!secondary_init_pid)) {
       rcu_read_unlock();
-      curr_secondary_ctr++;
       continue;
     }
     secondary_init_task = pid_task(secondary_init_pid, PIDTYPE_PID);
     if (unlikely(!secondary_init_task)) {
         rcu_read_unlock();
-        curr_secondary_ctr++;
         continue;
     }
     get_task_struct(secondary_init_task);
@@ -163,15 +201,15 @@ void twopa(void) {
         /* We only care about migrating running tasks, so if this_task is not
          * in a runnable state, skip it */
         get_task_struct(this_task);
-        if (this_task->state != TASK_RUNNING) {
+        if (!task_is_running(this_task)) {
           put_task_struct(this_task);
           rcu_read_unlock();
           continue;
         }
         /* If this_task's current CPU is NOT marked as having at least 1 active
          * task, leave this_task in place and mark that CPU has having a task. */
-        if (!has_task[this_task->cpu]) {
-            has_task[this_task->cpu] = 1;
+        if (!has_task[task_cpu(this_task)]) {
+            has_task[task_cpu(this_task)] = 1;
             num_placements++;
             put_task_struct(this_task);
             rcu_read_unlock();
@@ -179,7 +217,7 @@ void twopa(void) {
         }
         /* Make sure we don't try and put this_task on its current CPU if it
          * needs migration */
-        if (idleCpuStats->affinity_list[curr_cpu] == this_task->cpu) curr_cpu++;
+        if (idleCpuStats->affinity_list[curr_cpu] == task_cpu(this_task)) curr_cpu++;
         /* Loop around if we have exceeded number of affinity CPUs */
         if (curr_cpu == idleCpuStats->num_affinity) curr_cpu = 0;
 
@@ -284,7 +322,7 @@ int check_idle_cpus(void *data)
         }
         idleCount = 0;
         for (curr_cpu = 0; curr_cpu < NUMCPUS; curr_cpu++) {
-            is_idle = idle_cpu(cpuList[curr_cpu]);
+            is_idle = idle_cpu_fn(cpuList[curr_cpu]);
             if (is_idle) {
                 /* bit is 0 for idle */
                 currMask &= ~(1ULL << (cpuList[curr_cpu]));
@@ -402,7 +440,12 @@ static int __init idlecpu_init(void)
     int ret;
 
     printk(KERN_INFO "Loaded QUERY_IDLECPU module\n");
-     
+
+    ret = resolve_idle_cpu();
+    if (ret < 0)
+        return ret;
+    LOGSIZE = logsize;
+
     ret = logger_proc_init();
     if (ret == -1)
         goto out;
@@ -425,7 +468,11 @@ static int __init idlecpu_init(void)
         goto out;
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+    class = class_create(CLASS_NAME);
+#else
     class = class_create(THIS_MODULE, CLASS_NAME);
+#endif
     if (IS_ERR(class)){
         unregister_chrdev(major, DEVICE_NAME);
         pr_info("qidlecpu: failed to register device class");
@@ -448,7 +495,9 @@ static int __init idlecpu_init(void)
     }
 
     /* Init this mmap area */
-    sh_mem = kmalloc(SHMEM_SIZE, GFP_KERNEL);
+    /* Zeroed so balancerControl etc. start at 0 before the polling
+     * kthread initializes its fields */
+    sh_mem = kzalloc(SHMEM_SIZE, GFP_KERNEL);
     if (sh_mem == NULL) {
         ret = -ENOMEM;
         goto out;
@@ -479,4 +528,3 @@ module_exit(idlecpu_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Adam Hall");
 MODULE_DESCRIPTION("Query idle_cpu");
-MODULE_SUPPORTED_DEVICE("idlecpu");

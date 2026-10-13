@@ -8,8 +8,8 @@ source ../Config/SYSTEM.sh
 source ./secondary.sh
 
 MUTILATE_ALIAS="clabsvr"
-MUTILATE_HOST="192.168.10.10:32003"
-MEMCACHED_HOST="192.168.10.11:31212"
+MUTILATE_HOST="${SERVER_IP}:32003"
+MEMCACHED_HOST="${CLIENT_IP}:31212"
 
 ITER=$1
 SECONDARY_WORKERS=$2
@@ -31,7 +31,7 @@ SUMMARY_FILE="summary"
 
 if [ $TYPE == "harvest-irq" ] || [ $TYPE == "baseline-irq" ]; then
   MUTILATE_ALIAS="clabcl1"
-  MUTILATE_HOST="192.168.10.11:32005"
+  MUTILATE_HOST="${CLIENT_IP}:32005"
   SUMMARY_FILE="memcached-irq.summary"
 fi
 
@@ -150,7 +150,7 @@ harvest() {
 
   echo "[+] Start secondary workload in foreground"
   if [ $TYPE == "harvest-irq" ]; then
-    secondary $DURATION "192.168.10.11:30300" "nwbully-secondary"
+    secondary $DURATION "${CLIENT_IP}:30300" "nwbully-secondary"
   else  
     secondary $DURATION
   fi

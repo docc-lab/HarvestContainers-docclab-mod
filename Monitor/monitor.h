@@ -17,7 +17,11 @@ struct logentry {
     unsigned long long mask;
 };
 struct logentry *events;
-#define LOGSIZE ((1000 * 1000 * 1000) / 100) * 60
+/* Max number of cpulogger entries; set via the logsize module param.
+ * The original fixed size (600M entries, ~14.4 GB of vmalloc) is too
+ * large to allocate eagerly at insmod on most nodes. */
+#define DEFAULT_LOGSIZE (60UL * 1000 * 1000)
+unsigned long LOGSIZE;
 
 int __init logger_proc_init(void);
 void __exit logger_proc_cleanup(void);

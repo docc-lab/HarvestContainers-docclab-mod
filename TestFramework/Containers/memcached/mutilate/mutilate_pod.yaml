@@ -7,6 +7,8 @@ metadata:
 spec:
   nodeSelector:
     node-role.kubernetes.io/control-plane: ""
+    # Pin to node-0 (clabsvr): results are written to its /mnt/extra via hostPath
+    kubernetes.io/hostname: node-0
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists

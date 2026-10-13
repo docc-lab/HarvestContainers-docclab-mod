@@ -7,7 +7,7 @@ source ../Config/SYSTEM.sh
 source ./secondary.sh
 
 
-XAPIAN_IP="192.168.10.11"
+XAPIAN_IP="${CLIENT_IP}"
 XAPIAN_PORT="31000"
 XAPIAN_ALIAS="clabcl1"
 XAPIAN_SRC=~/HarvestContainers/TestFramework/Containers/xapian/xapian-src/xapian
@@ -72,7 +72,7 @@ runXapian() {
 runMysql() {
   # Start ycsb
   echo "[+] Start ycsb workload on MySQL"
-  curl --data "{\"trial\":\"${LOGFILE}\",\"qps\":\"${MYSQL_QPS}\",\"duration\":\"${DURATION}\"}" --header "Content-Type: application/json" http://192.168.10.10:32002/run
+  curl --data "{\"trial\":\"${LOGFILE}\",\"qps\":\"${MYSQL_QPS}\",\"duration\":\"${DURATION}\"}" --header "Content-Type: application/json" http://${SERVER_IP}:32002/run
 
 }
 
@@ -192,10 +192,10 @@ harvest() {
   runMysql &
 
   echo "[+] Start x264 workload in background"
-  secondary $DURATION "192.168.10.11:30002" "x264-secondary" &
+  secondary $DURATION "${CLIENT_IP}:30002" "x264-secondary" &
 
   echo "[+] Start dedup workload in foreground"
-  secondary $DURATION "192.168.10.11:30001" "dedup-secondary"
+  secondary $DURATION "${CLIENT_IP}:30001" "dedup-secondary"
 
   echo "[+] Stopping Modules"
   stopLogging idlecpu

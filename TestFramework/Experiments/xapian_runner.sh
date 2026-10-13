@@ -6,7 +6,7 @@ source ../bin/boilerplate.sh
 source ../Config/SYSTEM.sh
 source ./secondary.sh
 
-XAPIAN_IP="192.168.10.11"
+XAPIAN_IP="${CLIENT_IP}"
 XAPIAN_PORT="31000"
 XAPIAN_ALIAS="clabcl1"
 XAPIAN_SRC="../Containers/xapian/xapian-src/xapian"
@@ -146,7 +146,7 @@ harvest() {
 
   echo "[+] Start secondary workload in foreground"
   if [ $TYPE == "harvest-irq" ]; then
-    secondary $DURATION "192.168.10.11:30300" "nwbully-secondary"
+    secondary $DURATION "${CLIENT_IP}:30300" "nwbully-secondary"
   else  
     secondary $DURATION
   fi

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ../Config/SYSTEM.sh
+
 echo "[+] Creating directories experiment data"
 ./create-output-dirs.sh
 
@@ -75,7 +77,7 @@ sleep 120
 
 # [~5 sec] load data
 echo "[+] Load memcached-primary dataset"
-curl --connect-timeout 120 --data "{\"memcached_server\":\"192.168.10.11:31212\"}" --header "Content-Type: application/json" http://192.168.10.10:32003/load
+curl --connect-timeout 120 --data "{\"memcached_server\":\"${CLIENT_IP}:31212\"}" --header "Content-Type: application/json" http://${SERVER_IP}:32003/load
 
 echo "[+] Setting up mysql-primary"
 cd ~/HarvestContainers/TestFramework/Containers/MySQL/
@@ -86,6 +88,13 @@ sleep 15
 
 cd ycsb
 docker pull asarma31/ycsb:latest
+# ycsb's db.properties is mounted from this ConfigMap (the copy baked into the image hardcodes the MySQL host)
+printf 'db.driver=com.mysql.jdbc.Driver
+db.url=jdbc:mysql://${CLIENT_IP}:32306/ycsb?useSSL=false&rewriteBatchedStatements=true
+db.user=root
+db.passwd=harvest
+' > /tmp/db.properties
+kubectl create configmap ycsb-db-properties --from-file=db.properties=/tmp/db.properties --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f ycsb_pod.yaml
 sleep 15
 kubectl apply -f ycsb_svc.yaml
@@ -99,7 +108,7 @@ sleep 120
 # [~2 min] load data
 # currently ignores mysql_server as it's hardcoded. TODO: change this
 echo "[+] Load mysql-primary dataset"
-curl --connect-timeout 120 --data "{\"mysql_server\":\"192.168.10.11:32306\"}" --header "Content-Type: application/json" http://192.168.10.10:32002/load
+curl --connect-timeout 120 --data "{\"mysql_server\":\"${CLIENT_IP}:32306\"}" --header "Content-Type: application/json" http://${SERVER_IP}:32002/load
 
 
 echo "[+] Setting up xapian-primary"

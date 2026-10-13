@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ../Config/SYSTEM.sh
+
 start=1
 end=1
 dur=60
@@ -9,10 +11,10 @@ dur=60
 echo "[+] Pinning cores for workloads"
 cur_dir=$(pwd)
 cd ~/HarvestContainers/TestFramework/Tools/
-./pincores.sh 2,4,6,8,10,12,14,16 clabcl1 memcached-primary
-./pincores.sh 2,4,6,8,10,12,14,16 clabcl1 mysql-primary
-./pincores.sh 2,4,6,8,10,12,14,16 clabcl1 xapian-primary 
-./pincores.sh 18 clabcl1 cpubully-secondary
+./pincores.sh ${CPULIST} clabcl1 memcached-primary
+./pincores.sh ${CPULIST} clabcl1 mysql-primary
+./pincores.sh ${CPULIST} clabcl1 xapian-primary
+./pincores.sh ${SECONDARY_CPULIST} clabcl1 cpubully-secondary
 cd $cur_dir
 
 start_time=$(date +%s)

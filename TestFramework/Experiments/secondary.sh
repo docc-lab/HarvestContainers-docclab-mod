@@ -23,12 +23,12 @@ irq_secondary() {
   num_clients=1
   for((i=0;i<num_clients;i++)); do
     port=\$((30301+i))
-    iperf3 -c 192.168.10.11 -t $DURATION -p \$port > /tmp/\$port.out 2>&1 &
+    iperf3 -c ${CLIENT_IP} -t $DURATION -p \$port > /tmp/\$port.out 2>&1 &
   done
 EOF
 
   let dur=$DURATION/60
-  curl --data "{\"duration\":\"${dur}\",\"workers\":\"${SECONDARY_WORKERS}\",\"trial\":\"${ITER}\"}" --header "Content-Type: application/json" http://192.168.10.11:30000/
+  curl --data "{\"duration\":\"${dur}\",\"workers\":\"${SECONDARY_WORKERS}\",\"trial\":\"${ITER}\"}" --header "Content-Type: application/json" http://${CLIENT_IP}:30000/
 
 }
 
@@ -53,7 +53,7 @@ secondary() {
 
   SECONDARY_HOST=$2
   if [ -z "$SECONDARY_HOST" ]; then
-    SECONDARY_HOST="192.168.10.11:30000"
+    SECONDARY_HOST="${CLIENT_IP}:30000"
   fi
 
 

@@ -316,7 +316,7 @@ void cleanup(void)
     free(events);
     free(idleMaskChanges);
     free(dynamicEvents);
-    munmap(idle_shm, 4096);
+    munmap(idle_shm, SHMEM_SIZE);
     close(shm_fd);
     return;
 }
@@ -429,7 +429,7 @@ void checkCtrInfo() {
 
 int main(int argc, char **argv)
 {
-    if (argc < 5) {
+    if (argc < 6) {
         printf("Usage: ./balancer <secondary_pid> <targetIdleCores> <minSecondaryCores> <cpuList> <secondaryCpuList>\n");
         exit(0);
     }

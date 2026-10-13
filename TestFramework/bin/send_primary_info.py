@@ -9,8 +9,12 @@ CTR_TYPE="Primary"
 
 cpuList = sys.argv[1]
 acbf = sys.argv[2]
+# Optional: targetIdleCores (must be < number of cores in cpuList) and LOW_TIC.
+# Defaults match the original 8-core Primary setup.
+tic = sys.argv[3] if len(sys.argv) > 3 else "7"
+low_tic = sys.argv[4] if len(sys.argv) > 4 else "2"
 
-msg = '{"ctr_type":"' + CTR_TYPE + '","cpuList":"' + cpuList + '","LOWIDLEFREQ_THRESHOLD":"' + acbf + '","LOW_TIC":"2","targetIdleCores":"7","static_targetIdleCores":"7","minSecondaryCores":"0"}'
+msg = '{"ctr_type":"' + CTR_TYPE + '","cpuList":"' + cpuList + '","LOWIDLEFREQ_THRESHOLD":"' + acbf + '","LOW_TIC":"' + low_tic + '","targetIdleCores":"' + tic + '","static_targetIdleCores":"' + tic + '","minSecondaryCores":"0"}'
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setblocking(1)

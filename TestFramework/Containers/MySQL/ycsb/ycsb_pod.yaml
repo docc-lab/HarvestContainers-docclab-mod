@@ -7,6 +7,8 @@ metadata:
 spec:
   nodeSelector:
     node-role.kubernetes.io/control-plane: ""
+    # Pin to node-0 (clabsvr): results are written to its /mnt/extra via hostPath
+    kubernetes.io/hostname: node-0
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
@@ -30,7 +32,15 @@ spec:
       volumeMounts:
         - name: ycsb-results
           mountPath: /app/results
+        # db.properties baked into the image hardcodes the MySQL host;
+        # override it from the ycsb-db-properties ConfigMap (setup_workload.sh)
+        - name: ycsb-db-properties
+          mountPath: /app/ycsb-0.17.0/db.properties
+          subPath: db.properties
   volumes:
+    - name: ycsb-db-properties
+      configMap:
+        name: ycsb-db-properties
     - name: ycsb-results
       hostPath:
         path: /mnt/extra/results/mysql
