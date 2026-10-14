@@ -23,12 +23,14 @@
 
 pid_t curr_secondary_pids[MAX_SECONDARY_PIDS] = {0};
 
-/* Candidate roots for pod cgroups. The cgroup v1 cpuset hierarchy is kept
- * first so the original v1 setup still works unchanged. */
+/* Candidate roots for pod cgroups. The v2 roots come first: on a v2 host
+ * an empty cgroup can exist at cpuset/kubepods/.../pod<uid> (a plain v2
+ * child named "cpuset"), and matching it first hides the real pod. The
+ * v2 roots don't exist on a v1 host, so the original setup is unaffected. */
 static const char *cgroup_roots[] = {
-    "/sys/fs/cgroup/cpuset/kubepods",
     "/sys/fs/cgroup/kubepods",
     "/sys/fs/cgroup/kubepods.slice",
+    "/sys/fs/cgroup/cpuset/kubepods",
     NULL
 };
 
@@ -36,6 +38,25 @@ static int is_dir(const char *path)
 {
     struct stat st;
     return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* A pod cgroup holds one subdirectory per container */
+static int has_subdir(const char *dir)
+{
+    DIR *d;
+    struct dirent *ent;
+    char path[PATH_MAX];
+    int found = 0;
+
+    d = opendir(dir);
+    if (!d) return 0;
+    while (!found && (ent = readdir(d))) {
+        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+        snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
+        found = is_dir(path);
+    }
+    closedir(d);
+    return found;
 }
 
 /* Recursively search dir for a subdirectory whose name contains pod_id
@@ -56,6 +77,10 @@ static int find_pod_dir_in(const char *dir, const char *pod_id, const char *pod_
         snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
         if (!is_dir(path)) continue;
         if (strstr(ent->d_name, pod_id) || strstr(ent->d_name, pod_id_us)) {
+            if (!has_subdir(path)) {
+                printf("[!] [Listener] Skipping %s: no container cgroups\n", path);
+                continue;
+            }
             snprintf(out, out_len, "%s", path);
             found = 1;
             break;
