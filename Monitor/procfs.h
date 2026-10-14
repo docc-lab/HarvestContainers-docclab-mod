@@ -287,12 +287,14 @@ static ssize_t irqtime_reader(struct file *file, char __user *ubuf, size_t count
 static ssize_t log_reader(struct file *file, char __user *ubuf, size_t count,
                         loff_t *offset)
 {
-    char *buf;
+    /* "sec,nsec,<up to 64 mask digits>\n". This used to be a
+     * sizeof(struct logentry) (24-byte) vmalloc, which copy_to_user's
+     * object-size check rejects with EFAULT on newer kernels. */
+    char buf[128];
     char *human_readable_mask;
     int i;
     if (entrypos > numentries-1)
         return 0;
-    buf = vmalloc(sizeof(struct logentry));
     /* Write human-friendly 1's and 0's */
     human_readable_mask = vmalloc(sizeof(char)*(1+cpuList[NUMCPUS-1]+1));
     for (i = 0; i <= cpuList[NUMCPUS-1]; i++) {
@@ -302,17 +304,15 @@ static ssize_t log_reader(struct file *file, char __user *ubuf, size_t count,
     }
     human_readable_mask[i] = '\0';
 
-    procfs_buffer_size = sprintf(buf, "%lu,%lu,%s\n",
-                            events[entrypos].sec, events[entrypos].nsec, 
+    procfs_buffer_size = scnprintf(buf, sizeof(buf), "%lu,%lu,%s\n",
+                            events[entrypos].sec, events[entrypos].nsec,
                             human_readable_mask);
-
-    if (copy_to_user(ubuf, buf, procfs_buffer_size)) {
-        vfree(buf);
-        vfree(human_readable_mask);
-        return -EFAULT;
-    }
-    vfree(buf);
     vfree(human_readable_mask);
+
+    if (procfs_buffer_size > count)
+        return -EINVAL;
+    if (copy_to_user(ubuf, buf, procfs_buffer_size))
+        return -EFAULT;
     entrypos++;
     *offset = procfs_buffer_size;
     return procfs_buffer_size;
