@@ -235,18 +235,23 @@ static ssize_t cpulist_reader(struct file *file, char __user *ubuf, size_t count
 static ssize_t mask_reader(struct file *file, char __user *ubuf, size_t count, 
                             loff_t *offset)
 {
-    char *buf;
+    char buf[64];
+    int len;
 
     if (*offset > 0 || count < PROCFS_MAX_SIZE)
         return 0;
-    
-    buf = vmalloc(sizeof(char)*1);
-    procfs_buffer_size = sprintf(buf, "%d\n", numIdleCpus);
-    if (copy_to_user(ubuf, buf, procfs_buffer_size))
+
+    /* Idle count and busy mask (bit set = CPU busy) as published to the
+     * Balancer. This used to sprintf the never-updated numIdleCpus into a
+     * 1-byte vmalloc, which copy_to_user's object-size check rejects with
+     * EFAULT on newer kernels. */
+    len = scnprintf(buf, sizeof(buf), "%d 0x%llx\n",
+                    idleCpuStats ? idleCpuStats->numIdle : 0,
+                    idleCpuStats ? idleCpuStats->mask : 0ULL);
+    if (copy_to_user(ubuf, buf, len))
         return -EFAULT;
-    vfree(buf);
-    *offset = procfs_buffer_size;
-    return procfs_buffer_size;
+    *offset = len;
+    return len;
 }
 
 static ssize_t irqtime_reader(struct file *file, char __user *ubuf, size_t count, 
