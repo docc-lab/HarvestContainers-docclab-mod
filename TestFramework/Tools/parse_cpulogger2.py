@@ -106,7 +106,7 @@ def print_events():
     print(final.T)
 
     ratio = arr/total_events
-    avg = np.round_(np.dot(ratio,core_counts), 2)
+    avg = np.round(np.dot(ratio,core_counts), 2)
     print(f"event weighted average active cores: {avg}")
 
 def print_agg_time_spent():
@@ -120,7 +120,7 @@ def print_agg_time_spent():
     print(final.T)
 
     ratio = arr/total_time
-    avg = np.round_(np.dot(ratio,core_counts), 2)
+    avg = np.round(np.dot(ratio,core_counts), 2)
     print(f"time weighted average active cores: {avg}")
 
 
