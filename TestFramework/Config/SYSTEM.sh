@@ -23,13 +23,15 @@ fi
 if [ "${ENV_TYPE}" == "ICELAKE" ]
 then
   WORKING_DIR="${HOME}/HarvestContainers/TestFramework"
-  # Assumes socket 1 = CPUs 16-31 with nosmt; check `lscpu -e` on the
-  # harvest node and adjust. CPU 0 / socket 0 are left for housekeeping+IRQs.
-  CPULIST="17,18,19,20,21,22,23,24"
-  SECONDARY_CPULIST="25"
-  MONITOR_BINDCPU="31"
-  BALANCER_BINDCPU="30"
-  LISTENER_BINDCPU="29"
+  # sm110p is one 16-core socket; with nosmt=force only CPUs 0-15 are
+  # online. 0-1 are left for housekeeping+IRQs; the 8 Primary + 1
+  # Secondary cores keep the c6420 layout's proportions. The daemon cores
+  # match HC_*_CPU in /etc/default/hc-harvest.
+  CPULIST="2,3,4,5,6,7,8,9"
+  SECONDARY_CPULIST="10"
+  MONITOR_BINDCPU="15"
+  BALANCER_BINDCPU="14"
+  LISTENER_BINDCPU="13"
   # Matches the 2.4 GHz frequency floor used in the dsb_hd_counter runs
   CPU_FREQ="2400000"
   SERVER_NODE="node-0"
