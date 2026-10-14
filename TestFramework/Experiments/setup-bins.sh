@@ -4,9 +4,12 @@ build() {
   echo "[+] Build bins"
   cur=$(pwd)
 
-  cd $cur/../../Listener && make
-  cd $cur/../../Monitor && make
-  cd $cur/../../Balancer && make
+  # clean first: a fresh clone gives the sources and a committed binary
+  # the same mtime, so a plain make can skip the build and we would copy
+  # the stale binary (this happened with Listener/listener).
+  cd $cur/../../Listener && make clean && make
+  cd $cur/../../Monitor && make clean && make
+  cd $cur/../../Balancer && make clean && make
 
   cd $cur
 }
